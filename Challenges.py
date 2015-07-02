@@ -14,6 +14,8 @@ from datetime import datetime
 from pandas import DataFrame, Series
 import pandas as pd; import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.style.use('ggplot')
 
 def Challenge_1():
     f = open('turnstile_150404.txt')
@@ -205,20 +207,28 @@ def ReadData(file='turnstile_150404.txt'):
     
     rows.pop(-1)
     return rows
+
+def CombineData(dlist=['turnstile_150404.txt', 'turnstile_150411.txt', 'turnstile_150418.txt', 'turnstile_150425.txt']):
+    output = []
+    for i, item in enumerate(dlist):
+        if i>0:
+            readin = ReadData(item)
+            readin.pop(0)
+            output.extend(readin)
+        else:
+            readin = ReadData(item)
+            output.extend(readin)
+    return output
     
 def CleanData():
-    #Read, clean data and add ID column
-    data = ReadData()
+    data = CombineData()
     col = data[0]
     data = pd.DataFrame(data, columns = col)
     data = data.ix[1:, :]
-    
     #Get rid of data that has negative entry values
     data = data[data.ENTRIES > 0]
-    
     #Get rid of data with entries that are really high
     data = data[data.ENTRIES < 400000]
-
     return data
     
 def aggregateF(group1='DATE', group2=None, output='ENTRIES', data=None):
@@ -233,6 +243,7 @@ def aggregateF(group1='DATE', group2=None, output='ENTRIES', data=None):
         values= data.groupby([group1])[output].agg('sum').order(ascending=False)
     else:
         values= data.groupby([group1,group2])[output].agg('sum')
+        values = values.reset_index()
     #values = values.groupby(level=0).apply(lambda x: x.order(ascending=False))
     return values
 
@@ -244,19 +255,15 @@ def stationPlot(station='34 ST-PENN STA', x='TIME', y='ENTRIES', data=None):
  
 #Challenge 8
 def Challenge_8(station='34 ST-PENN STA'):
+    print station
     data = CleanData()
-    data1 = data[data.Week == 13]
-    data2 = data[data.Week == 14]
+    d1 = data.groupby(['STATION', 'Weekday', 'Week'])['TRAFFIC'].agg('sum')
+    d1 = d1.reset_index()
     
-    s1 = aggregateF('STATION', 'Weekday', 'TRAFFIC', data1)
-    s1.name = 'Week13'
-    s2 = aggregateF('STATION', 'Weekday', 'TRAFFIC', data2)
-    s2.name = 'Week14'
-    output = pd.concat([s1, s2], axis=1)
+    output = d1[d1['STATION'] == station]
+    output = output.pivot('Weekday', 'Week', 'TRAFFIC')
     
-    output = output.ix[station, ]
-    output.plot()
- 
+    plt.figure(); output.plot(); plt.legend(loc='best')
 
 #Challenge 10
 def Challenge_10():
@@ -264,6 +271,14 @@ def Challenge_10():
     a = a[a.TRAFFIC > 0]
     data = aggregateF('STATION', output='TRAFFIC', data=a)
     data.hist(bins=20)
+
+'''
+ts = Series(np.random.randn(1000), index=pd.date_range('1/1/2000', periods=1000))
+ts = ts.cumsum()
+df = DataFrame(np.random.randn(1000, 4), index=ts.index, columns=list('ABCD'))
+df = df.cumsum()
+plt.figure(); df.plot(); plt.legend(loc='best')
+'''
 
     
 
