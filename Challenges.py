@@ -220,6 +220,20 @@ def CombineData(dlist=['turnstile_150404.txt', 'turnstile_150411.txt', 'turnstil
             output.extend(readin)
     return output
     
+def labelTime(num):
+    if num.hour < 11:
+        return 'Morning'
+    elif num.hour >= 11 and num.hour < 14:
+        return 'Lunch'
+    elif num.hour >= 14 and num.hour < 19:
+        return 'Afternoon'
+    else:
+        return 'Evening/Night'
+
+def labelWeekday(num):
+    weekdays = {1:'Monday', 2:'Tuesday', 3:'Wednesday', 4:'Thursday', 5:'Friday', 6:'Saturday', 7:'Sunday'}
+    return weekdays[num]
+
 def CleanData():
     data = CombineData()
     col = data[0]
@@ -227,8 +241,15 @@ def CleanData():
     data = data.ix[1:, :]
     #Get rid of data that has negative entry values
     data = data[data.ENTRIES > 0]
+    data = data[data.EXITS > 0]
     #Get rid of data with entries that are really high
     data = data[data.ENTRIES < 400000]
+    
+    data.ind
+    
+    data['TimePeriod'] = data['DateTime'].apply(labelTime)
+    data['StationLine'] = data['STATION'] + ' ' + data['LINENAME']
+    data['WeekdayLabel'] = data['Weekday'].apply(labelWeekday)
     return data
     
 def aggregateF(group1='DATE', group2=None, output='ENTRIES', data=None):
@@ -248,21 +269,31 @@ def aggregateF(group1='DATE', group2=None, output='ENTRIES', data=None):
     return values
 
 #Challenge 7
-def stationPlot(station='34 ST-PENN STA', x='TIME', y='ENTRIES', data=None):
-    series = aggregateF('STATION', x, y, data=data) 
+def stationPlot(station='34 ST-PENN STA', x='TIME', y='ENTRIES'):
+    data = aggregateF('STATION', x, y) 
+    data = data[data['STATION'] == station]
+    data.index = data[x]
     print(station)
-    series[station].plot()
+    data.plot()
  
 #Challenge 8
-def Challenge_8(station='34 ST-PENN STA'):
+def plotByTime(station='34 ST-PENN STA'):
     print station
     data = CleanData()
-    d1 = data.groupby(['STATION', 'Weekday', 'Week'])['TRAFFIC'].agg('sum')
+    d1 = data.groupby(['STATION', 'TimePeriod', 'Week'])['TRAFFIC'].agg('sum')
     d1 = d1.reset_index()
     
     output = d1[d1['STATION'] == station]
-    output = output.pivot('Weekday', 'Week', 'TRAFFIC')
-    
+    output = output.pivot('TimePeriod', 'Week', 'TRAFFIC')
+    plt.figure(); output.plot(); plt.legend(loc='best')
+
+def compareStations(stations=['34 ST-PENN STA','W 4 ST-WASH SQ'], group1='WeekdayLabel'):
+    data = CleanData()
+    d1 = data.groupby(['STATION', group1])['TRAFFIC'].agg('sum')
+    d1 = d1.reset_index()
+    output = d1[d1['STATION'].isin(stations)]
+    output.index = output['STATION']
+    output = output.pivot(group1, 'STATION', 'TRAFFIC')
     plt.figure(); output.plot(); plt.legend(loc='best')
 
 #Challenge 10
@@ -272,18 +303,77 @@ def Challenge_10():
     data = aggregateF('STATION', output='TRAFFIC', data=a)
     data.hist(bins=20)
 
+#Exporting Data
+
+#Data by station and weekday (entries, exits)
+#Data by station and turnstiles (entries, exits)
+
 '''
-ts = Series(np.random.randn(1000), index=pd.date_range('1/1/2000', periods=1000))
-ts = ts.cumsum()
-df = DataFrame(np.random.randn(1000, 4), index=ts.index, columns=list('ABCD'))
-df = df.cumsum()
-plt.figure(); df.plot(); plt.legend(loc='best')
+a = aggregateF('STATION')
+
+a.to_csv('TOPSTATIONS.csv')
+
+
+a = aggregateF('STATION', 'TIME', 'TRAFFIC')
+a.to_csv('TopStationsbyTime.csv')
+
+stationPlot(station='42 ST-GRD CNTRL', x='TIME', y='ENTRIES')
+stationPlot(station='42 ST-GRD CNTRL', x='TIME', y='EXITS')
+
+b = a.groupby(['STATION', 'LINENAME'])['TRAFFIC'].agg('sum')
+b.to_csv('StationsTrafficbyLineName.csv')
+
+a = CleanData()
+x = a.groupby(['StationLine', 'TimePeriod', 'Week'])['TRAFFIC'].agg('sum')
+x = x.reset_index()
+x = x[x.Week == 14]
+x = x.pivot('StationLine', 'TimePeriod','TRAFFIC')
+x.sort(columns = 'Morning', ascending = False).head(5)
+
+x.to_csv('StationsbyTimePeriodforTraffic.csv')
 '''
 
-    
+MTAdata = CleanData()
+print('Executed functions. Stored MTA data as MTAdata')
 
+
+'''Plotting Practice'''
     
-    
+#import numpy as np
+#import pandas as pd
+#import matplotlib.pyplot as plt 
+import matplotlib.dates as dates 
+
+idx = pd.date_range('2011-05-01', '2011-07-01')
+s = pd.Series(np.random.randn(len(idx)), index=idx)
+
+fig, ax = plt.subplots()
+ax.plot_date(idx.to_pydatetime(), s, 'v-')
+ax.xaxis.set_minor_locator(dates.WeekdayLocator(byweekday=(1),
+                                                interval=1))
+ax.xaxis.set_minor_formatter(dates.DateFormatter('%d\n%a'))
+ax.xaxis.grid(True, which="minor")
+ax.yaxis.grid()
+ax.xaxis.set_major_locator(dates.MonthLocator())
+ax.xaxis.set_major_formatter(dates.DateFormatter('\n\n\n%b\n%Y'))
+plt.tight_layout()
+plt.show()
+
+
+import matplotlib.pyplot as plt
+plt.figure(1)                # the first figure
+plt.subplot(211)             # the first subplot in the first figure
+plt.plot([1,2,3])
+plt.subplot(212)             # the second subplot in the first figure
+plt.plot([4,5,6])
+
+
+plt.figure(2)                # a second figure
+plt.plot([4,5,6])            # creates a subplot(111) by default
+
+plt.figure(1)                # figure 1 current; subplot(212) still current
+plt.subplot(211)             # make subplot(211) in figure1 current
+plt.title('Easy as 1,2,3')   # subplot 211 title
     
     
        
